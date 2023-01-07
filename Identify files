@@ -1,0 +1,12 @@
+import magic
+
+def get_file_type(filename):
+    m = magic.open(magic.MAGIC_NONE)
+    m.load()
+    file_type = m.file(filename)
+    return file_type
+
+filename = input("Enter the name of the file: ")
+
+file_type = get_file_type(filename)
+print(f"The file type of {filename} is: {file_type}")
