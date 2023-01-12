@@ -1,0 +1,26 @@
+import sys
+import pefile
+
+def check_file(file_path):
+    try:
+        pe = pefile.PE(file_path)
+        if pe.OPTIONAL_HEADER.SizeOfInitializedData == 0:
+            return "malware"
+        for section in pe.sections:
+            if b".unkn" in section.Name:
+                return "malware"
+        if (pe.OPTIONAL_HEADER.DllCharacteristics == 0 and
+            pe.OPTIONAL_HEADER.MajorImageVersion == 0 and
+            pe.OPTIONAL_HEADER.CheckSum == 0):
+            return "malware"
+        else:
+            return "benign"
+    except pefile.PEFormatError:
+        return "Not a valid PE file"
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Please provide a file path to analyze")
+        sys.exit(1)
+    file_path = sys.argv[1]
+    print(check_file(file_path))
