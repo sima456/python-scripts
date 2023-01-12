@@ -1,0 +1,59 @@
+import argparse
+import time
+import os
+import pefile
+def get_files(directory, file_ext=None):
+    """
+    Returns a list of files in a directory that have the specified file extension.
+
+    :param directory: The path of the directory to search in.
+    :param file_ext: An optional tuple of file extensions to filter by.
+    """
+    files = []
+    for file in os.listdir(directory):
+        path = os.path.join(directory, file)
+        if os.path.isfile(path):
+            if file_ext is None or os.path.splitext(path)[1][1:] in file_ext:
+                files.append(path)
+    return files
+
+def is_unknown_section_name(file):
+    """
+    Returns True if any section in the PE file has an unknown name.
+
+    :param file: The path of the PE file to analyze.
+    """
+    known_names = ("text", "bss", "data", "rsrc", "debug", "reloc", "winzip", "tls",
+                   "UPX", "boom", "seau", "code", "Shared", "gentee", "CODE", "DATA",
+                   "BSS", "CRT", "PAGE", "INIT", "res", "asp", "tsu", "TEXT")
+    pe = pefile.PE(file, fast_load=True)
+    for section in pe.sections:
+        name = section.Name.decode()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("directory", help="The directory path containing the files to scan")
+    parser.add_argument("file_ext", nargs='*', default=('.exe', '.dll'), help="File extension of files to scan")
+    args = parser.parse_args()
+
+    numberOfFiles = 0
+    sizeOfInitializedData = 0
+    abnormalName = 0
+    dllCharacteristics = 0
+    majorImageVersion = 0
+    checkSumCount = 0
+    malware = 0
+
+    start = time.time()
+    fileList = get_files(args.directory, args.file_ext)
+    for f in fileList:
+        pe = pefile.PE(f, fast_load=True)
+        numberOfFiles = numberOfFiles + 1
+        if pe.OPTIONAL_HEADER.SizeOfInitializedData == 0:
+            malware = malware + 1
+        elif is_unknown_section_name(f) == 1:
+            malware = malware + 1
+
+    end = time.time()
+    elapsed = end - start
+    print("Malware Find: ", malware)
+    print("The time for running this program: ", elapsed)
