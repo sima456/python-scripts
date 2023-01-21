@@ -1,0 +1,49 @@
+import hashlib
+import pefile
+
+def display_ar(section):
+    """
+    Show access rights of a section
+    """
+    res = ""
+    if section.IMAGE_SCN_MEM_READ:
+        res += "R"
+    else:
+        res += "-"
+    if section.IMAGE_SCN_MEM_WRITE:
+        res += "W"
+    else:
+        res += "-"
+    if section.IMAGE_SCN_MEM_EXECUTE:
+        res += "X"
+    else:
+        res += "-"
+    return res
+
+def hex_to_decimal(hex_value):
+    """Convert a hexadecimal value to decimal"""
+    return int(hex_value, 16)
+
+def display_sections(file_path):
+    """Display information about the PE sections"""
+    pe = pefile.PE(file_path)
+    print("{:9} {:4} {:10} {:10} {:9} {:9} {:8} {}".format("Name", "RWX", "VirtSize", "VirtAddr", "RawAddr", "RawSize", "Entropy", "md5"))
+    for section in pe.sections:
+        name = section.Name.decode('utf-8', 'ignore').strip('\x00')
+        m = hashlib.md5()
+        m.update(section.get_data())
+        print("{:9} {:4} {:10} {:10} {:9} {:9} {:6.2f} {}".format(
+            name,
+            display_ar(section),
+            hex_to_decimal(hex(section.Misc_VirtualSize)),
+            hex_to_decimal(hex(section.VirtualAddress)),
+            hex_to_decimal(hex(section.PointerToRawData)),
+            hex_to_decimal(hex(section.SizeOfRawData)),
+            section.get_entropy(),
+            m.hexdigest()
+        ))
+    print("")
+
+if __name__ == "__main__":
+    file_path = input("Please enter the path to the PE file:")
+    display_sections(file_path)
