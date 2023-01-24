@@ -1,0 +1,35 @@
+import os                                                  import socket
+import argparse
+
+def check_host(hostname, verbose=False):
+    try:
+        host_ip = socket.gethostbyname(hostname)                   if verbose:
+            print(f'{hostname} has IP address: {host_ip}')
+        else:
+            print(host_ip)                                     except socket.gaierror:
+        print(f'Error: {hostname} could not be resolved')
+
+def port_scan(hostname, ports):                                os.system(f'nmap -p {ports} {hostname}')
+
+def port_scan(hostname, ports, tool='nmap'):
+    if tool == 'nmap':
+        os.system(f'nmap -p {ports} {hostname}')
+    elif tool == 'nc':
+        for port in ports:
+            response = os.system(f'nc -z -v {hostname} {port}')
+            if response == 0:
+                print(f'Port {port} is open')
+            else:
+                print(f'Port {port} is closed')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Check the IP address and port of a host')
+    parser.add_argument('hostname', help='The hostname to check')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Show the hostname in the IP address output')
+    parser.add_argument('-p', '--ports', help='Ports to scan, separated by a comma (e.g. 22,80,443)')
+    parser.add_argument('-t', '--tool', default='nmap', choices=['nmap', 'nc'], help='The tool to use for port scanning')
+    args = parser.parse_args()
+
+    check_host(args.hostname, verbose=args.verbose)
+    if args.ports:
+        port_scan(args.hostname, args.ports.split(','), tool=args.tool)
