@@ -1,0 +1,66 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import subprocess
+from scapy.all import *
+from scapy_http import http
+import numpy as np
+
+import argparse
+
+# Create an Argument parser
+parser = argparse.ArgumentParser(description="PCAP file analyzer")
+
+# Add the file argument
+parser.add_argument("file", type=str, help="Name of the PCAP file to analyze")
+
+# Parse the arguments
+args = parser.parse_args()
+
+# Load the PCAP file                                            packets = rdpcap(args.file)
+
+# create tshark command
+tshark_cmd = f"tshark -r {args.file} -T fields -e frame.number -e frame.time_relative -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e udp.srcport -e udp.dstport -e _ws.col.Protocol -E header=y -E separator=, -E quote=d -E occurrence=f"
+
+# run tshark command and get the output
+tshark_output = subprocess.run(tshark_cmd, shell=True, capture_output=True)
+
+# parse the tshark output and create a DataFrame
+from io import StringIO
+
+...
+
+df = pd.read_csv(StringIO(tshark_output.stdout.decode('utf-8')))
+
+
+# Add new columns for packet direction and protocol
+df['Direction'] = np.where(df['ip.src'] == '192.168.1.1', 'Outgoing', 'Incoming')
+df['Protocol'] = np.where(df['tcp.srcport'].notna(), 'TCP', 'UDP')
+
+# Print the DataFrame
+print(df)
+
+# Group the DataFrame by protocol and direction and calculate the number of packets for each
+protocol_counts = df.groupby(["Protocol", "Direction"]).count()
+
+# Plot the protocol counts
+protocol_counts.plot(kind="bar")
+
+# Display the plot
+plt.show()
+
+# Use scapy-http to extract http request and response
+http_requests = []
+for packet in packets:
+    if packet.haslayer(http.HTTPRequest):
+        http_requests.append(packet)
+
+# Print the number of http requests
+print(f'Number of HTTP requests: {len(http_requests)}')
+
+# Print the http request headers
+for request in http_requests:
+    print(f'Source: {request[IP].src}')
+    print(f'Destination: {request[IP].dst}')
+    print(f'Method: {request[http.HTTPRequest].Method}')
+    print(f'Path: {request[http.HTTPRequest].Path}')
+    print('\n')
