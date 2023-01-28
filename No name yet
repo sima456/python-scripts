@@ -1,0 +1,91 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import subprocess
+from scapy.all import *
+from scapy_http import http
+import numpy as np
+import argparse
+from io import StringIO
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+from IPython.display import display, HTML
+
+# Create an Argument parser
+parser = argparse.ArgumentParser(description="PCAP file analyzer")
+
+# Add the file argument
+parser.add_argument("file", type=str, help="Name of the PCAP file to analyze")
+
+# Parse the arguments
+args = parser.parse_args()
+
+# Load the PCAP file
+packets = rdpcap(args.file)
+
+# create tshark command
+tshark_cmd = f"tshark -r {args.file} -T fields -e frame.number -e frame.time_relative -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e udp.srcport -e udp.dstport -e _ws.col.Protocol -E header=y -E separator=, -E quote=d -E occurrence=f"
+
+# run tshark command and get the output
+tshark_output = subprocess.run(tshark_cmd, shell=True, capture_output=True)
+
+# parse the tshark output and create a DataFrame
+df = pd.read_csv(StringIO(tshark_output.stdout.decode('utf-8')))
+
+# Add new columns for packet direction and protocol
+df['Direction'] = np.where(df['ip.src'] < df['ip.dst'], 'Outgoing', 'Incoming')
+df['Protocol'] = np.where(df['tcp.srcport'].notna(), 'TCP', 'UDP')
+
+# Print the DataFrame
+print("\nDataFrame of Packet Information:")
+print(df)
+
+# Group the DataFrame by protocol and direction and calculate the number of packets for each
+protocol_counts = df.groupby(["Protocol", "Direction"]).count()
+
+# Plot the protocol counts using plotly express
+fig = px.bar(protocol_counts.reset_index(), x='Protocol', y='frame.number', color='Direction', barmode='group', title='Protocol Counts')
+fig.show()
+
+# Use scapy-http to extract http request and response
+http_requests = []
+for packet in packets:
+    if packet.haslayer(http.HTTPRequest):
+        http_requests.append(packet)
+
+# Print the number of http requests
+print(f'Number of HTTP requests: {len(http_requests)}')
+
+# Print the http request headers
+for request in http_requests:
+    print(f'Source: {request[IP].src}')
+    print(f'Destination: {request[IP].dst}')
+    print(f'Method: {request[http.HTTPRequest].Method}')
+    print(f'Path: {request[http.HTTPRequest].Path}')
+    print('\n')
+
+# Use matplotlib to create interactive graphs
+import matplotlib.pyplot as plt
+import mpld3
+from mpld3 import plugins
+
+# Create a bar plot of the protocol counts
+protocol_counts.plot(kind="bar")
+
+# Use mpld3 to make the graph interactive and display it in the browser
+mpld3.show()
+
+# Filter out non-HTTP traffic
+http_df = df[df['_ws.col.Protocol'] == 'HTTP']
+
+# Create a new column with the request method
+http_df['Method'] = http_df.apply(lambda row: row['_ws.col.Info'].split(' ')[0], axis=1)
+
+# Group the DataFrame by method and direction and calculate the number of packets for each
+method_counts = http_df.groupby(['Method', 'Direction']).count()
+
+# Create a stacked bar plot of the method counts
+method_counts.plot(kind="bar", stacked=True)
+
+# Use mpld3 to make the graph interactive and display it in the browser
+mpld3.show()
