@@ -1,0 +1,140 @@
+import argparse
+import os
+
+def extract_functions(exe):
+    """
+    Extracts functions from the provided PE file
+    """
+    # Code to extract functions from exe
+    functions = []
+    # Extract functions
+    return functions
+
+def get_cfg(f):
+    """
+    Generates a control flow graph for the provided function
+    """
+    # Code to generate CFG for f
+    cfg = []
+    return cfg
+
+def get_number_of_edges(cfg):
+    """
+    Returns the number of edges in the provided CFG
+    """
+    return len(cfg)
+
+def find_longest_path(cfg):
+    """
+    Finds the longest path in the provided CFG
+    """
+    # Code to find longest path in cfg
+    path = []
+    return path
+
+def get_path_random_walk(cfg):
+    """
+    Gets a path through a random walk in the provided CFG
+    """
+    # Code to get path through random walk in cfg
+    path = []
+    return path
+
+def get_op_type(opcode):
+    """
+    Returns the type of the provided opcode
+    """
+    # Code to get opcode type
+    return mnem
+
+def sym_execute(opcode):
+    """
+    Performs symbolic execution on the provided opcode
+    """
+    # Code to perform symbolic execution on opcode
+    return
+
+def get_call_target(opcode):
+    """
+    Returns the call target of the provided opcode
+    """
+    # Code to get call target of opcode
+    return call_target
+
+def is_api_call(call_target):
+    """
+    Returns true if the provided call target is an API call
+    """
+    # Code to check if call target is API call
+    return is_api
+
+def look_up_import_table(call_target):
+    """
+    Looks up the import table for the provided call target and returns the name
+    """
+    # Code to look up import table for call_target
+    return name
+
+def look_up_number_of_arguments(name):
+    """
+    Looks up the number of arguments for the provided function name
+    """
+    # Code to look up number of arguments for name
+    return nargs
+
+def get_arguments_from_stack(nargs):
+    """
+    Gets the arguments from the stack for the provided number of arguments
+    """
+    # Code to get arguments from stack for nargs
+    return arguments
+
+def put_in_database(name, arguments):
+    """
+    Puts the provided function name and arguments in a database
+    """
+    # Code to put name and arguments in database
+    return
+
+def update_eax():
+    """
+    Updates the EAX register
+    """
+    # Code to update EAX register
+    return
+
+def analyze_pe(exe, verbose=False):
+    functions = extract_functions(exe)
+    for f in functions:
+        cfg = get_cfg(f)
+        nedges = get_number_of_edges(cfg)
+        if nedges < 100:
+            path = find_longest_path(cfg)
+        else:
+            path = get_path_random_walk(cfg)
+
+        for opcode in path:
+            mnem = get_op_type(opcode)
+            if mnem != "call":
+                if mnem in supported_mnemonics:
+                    sym_execute(opcode)
+            else:
+                call_target = get_call_target(opcode)
+                if is_api_call(call_target):
+                    name = look_up_import_table(call_target)
+                    nargs = look_up_number_of_arguments(name)
+                    arguments = get_arguments_from_stack(nargs)
+                    put_in_database(name, arguments)
+                update_eax()
+    if verbose:
+        print("Analysis completed")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Analyze a PE file")
+    parser.add_argument("exe", help="PE file to analyze")
+    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    args = parser.parse_args()
+    if os.path.isfile(args.exe):
+        analyze_pe(args.exe, args.verbose)
+    else:
+        print("File does not exist")
