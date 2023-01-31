@@ -1,0 +1,331 @@
+#!/usrbin/python3
+# -*- coding:utf-8 -*-
+
+from sys import argv
+from scapy.all import *
+from binascii import hexlify, unhexlify
+from re import findall
+from os import getcwd, listdir, mkdir
+from zipfile import ZipFile, ZIP_DEFLATED
+from shutil import rmtree
+
+
+def Helper():
+        print("""
+        Usage: PcapOrNotPcap [-h] [-a] [-ip] [-p] [-m] [-u] [-ic] [-d] [-e] <file.pcap>
+                Description:
+                        This is a script to parse a pcap file.
+                Options:
+                        -h                           Show this message
+                        -a                           General parsing
+                        -ip                          Parse IP (IP src / IP dst), IP Layer
+                        -p                           Parse ports (ports src / ports dst), TCP Layer
+                        -m                           Parse MAC address (MAC src / MAC dst), Ether Layer
+                        -u                           Parse ports (port src / ports dst), UDP Layer
+                        -ic                          Parse icmp paquet, ICMP Layer
+                        -d                           Parse data from paquets (all layer)
+                        -e                           If executable find in data then try to export this
+                                                     in 'output' directory. (not implemented for now)
+
+                """)
+
+
+def ExportResult(lIcmp, lUdp, lMac, lPort, lIP, d, exe):
+        """
+                Function to export all information recorded by the parsing
+                :param lIcmp:   Data from ICMP
+                :param lUdp:    Data from UDP
+                :param lMac:    Data from Ether
+                :param lPort:   Data from TCP
+                :param lIP:             Data from IP
+                :param d:               Data from ... Data (Raw layer)
+                :param exe:             Data from extracted PE
+        """
+        try:
+                # open in append mode to add without delete the other lines
+                with open('ImParsed.txt', 'a') as fl:
+                        fl.writelines('------------------------------------------------------\n')
+                        if lIP != None:
+                                fl.writelines(lIP)
+
+                        if lUdp != None:
+                                fl.writelines(lUdp)
+
+                        if lMac != None:
+                                fl.writelines(lMac)
+
+                        if lPort != None:
+                                fl.writelines(lPort)
+
+                        if lIcmp != None:
+                                fl.writelines(lIcmp)
+
+                        if d != None:
+                                if d.find('MZ') != -1:
+                                        fl.writelines('/!\\ PE find /!\\ \n')
+                                        fl.writelines(d)
+
+                        if exe != None:
+                                fl.writelines(exe)
+
+                        fl.writelines('------------------------------------------------------\n')
+
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParseUDP(pkt):
+        """
+                Function to parse and record the UDP src and dst port
+                :param pkt:             The packet to parse
+                :return:                Tuple of src and dst port
+        """
+        try:
+                try:
+                        return ('UDP Port SRC: %s\n' %(pkt[UDP].sport), 'UDP Port DST: %s\n' %(plt[UDP].dport))
+
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParseICMP(pkt):
+        """
+                Function to parse the layer ICMP and record the lenght and addr_mask
+                Can be used to find a date encapsulate in icmp
+                :param pkt:             The packet to parse
+                :return:                Tupe of ICMP lenght and ICMP address mask
+        """
+        try:
+                try:
+                        return ('ICMP Lenght: %s\n' %(pkt[ICMP].lenght), 'ICMP ADDR_Mask: %s\n' %(pkt[ICMP].addr_mask))
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParseIP(pkt):
+        """
+                Function to parse layer IP and record the src and dst IP
+                :param pkt:     The packet to parse
+                :return:                Tuple of src and dst IP
+        """
+        try:
+                try:
+                        return ('IP SRC: %s\n' %(pkt[IP].src), 'IP DST: %s\n' %(pkt[IP].dst))
+
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParsePorts(pkt):
+        """
+                Function to parse the layer TCP and record the src port and dst port
+                :param pkt:             The packet to parse
+                :return:                Tuple of src port and dst port
+        """
+        try:
+                try:
+                        return ('TCP Port SRC: %s\n' %(pkt[TCP].sport), 'TCP Port DST: %s\n' %(pkt[TCP].dport))
+
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParseMac(pkt):
+        """
+                Function to parse the Ether layer and record the mac src and dst
+                :param pkt:             The packet to parse
+                :return:                Tuple of src mac and dst mac
+        """
+        try:
+                try:
+                        return ('MAC SRC: %s\n' %(pkt[Ether].src), 'MAC DST: %s\n' %(pkt[ETHER].dst))
+
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParseData(pkt):
+        """
+                Function to parse the data and decode this
+                :param pkt:             packet to parse
+                :return:                The decoded data
+        """
+        try:
+                try:
+                        return 'Data :\n%s\n' % (str(unhexlify(b"".join(findall(b'..', hexlify(bytes(pkt.getlayer(Raw))))).decode('utf-8')))[2:-1])
+
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ParseExe(pkt):
+        """
+                Function to parse the data if present and if 'MZ' is find
+                Extract then the PE to an output dir.
+                :param pkt:             packet to parse
+                :return:                String to add in export file, no return if no PE
+        """
+        try:
+                try:
+                        # record the data decoded in string
+                        df = str(unhexlify(b"".join(findall(b'..', hexlify(bytes(pkt.getlayer(Raw))))).decode('utf-8')))
+                        # create the path for the output dir
+                        outdir = '%s\\output\\' %(getcwd())
+
+                        # if MZ present in data then extract the PE
+                        if df.find('MZ') != -1:
+                                # check if the output dir is present or not else create the folder
+                                if 'output' not in listdir(getcwd()):
+                                        mkdir(outdir)
+
+                                # list the file present in output dir
+                                flo = listdir(outdir)
+                                # open in write bytes mode the extracted PE
+                                with open('%s\\%s.exe' %(outdir, len(flo)+1), 'wb') as ExeF:
+                                        # write the hexadecimal data in file
+                                        ExeF.write(b"".join(findall(b'..', hexlify(bytes(pkt.getlayer(Raw))))).decode('utf-8'))
+
+                                # return a string to prevent the user in exported file
+                                return 'Executable Exported in %s\\%s.exe' %(outdir, len(flo)+1)
+
+                except:
+                        pass
+
+        except Exception as e:
+                print('\t\t\t[!] %s' %(e))
+
+
+def ZippedExe():
+        """
+                Zip with password the extracted PE
+                and delete the folder output and PE.
+        """
+        # create zip object in write mode
+        zf = ZipFile('output.zip', mode='w', compression=ZIP_DEFLATED)
+
+        # iter in all PE to add it in zip file
+        for f in listdir('%s\\output' %(getcwd())):
+                zf.write('%s\\output\\%s' %(getcwd(), f))
+
+        # set the password for the zip
+        zf.setpassword(b"infected")
+
+        # remove the output folder
+        rmtree('%s\\output' %(getcwd()))
+
+
+if __name__ == '__main__':
+        print("""
+
+        Welcome to ...
+         _____             _____     _____     _   _____
+        |  _  |___ ___ ___|     |___|   | |___| |_|  _  |___ ___ ___
+        |   __|  _| .'| . |  |  |  _| | | | . |  _|   __|  _| .'| . |
+        |__|  |___|__,|  _|_____|_| |_|___|___|_| |__|  |___|__,|  _|
+                      |_|                                       |_|
+                                                     Developed by Icenuke.
+
+        """)
+
+        # enter in this piece of code if the lenght of argv is sup  or equal to 2
+        if len(argv) >= 2:
+                # this is it in prevention of error reader pcap file
+                try:
+                        # init the vars pcaps reader
+                        pcaps = rdpcap(argv[-1])
+
+                        # init var IP for tuple IP src/dst
+                        tpIP = ""
+                        # init var Port for tuple port src/dst
+                        tpPort = ""
+                        # init var mac for tuple mac src/dst
+                        tpMac = ""
+                        # init var udp for tuple UDP port src/dst
+                        tpUdp = ""
+                        #init var icmp for tuple icmp lenght/addr_mask
+                        tpIcmp = ""
+                        #init var data raw with ip src/dst
+                        datas = ""
+                        # init pe var
+                        pe = ""
+
+                        # if -h present in argv then go to helper
+                        if '-h' in argv:
+                                Helper()
+
+                        # iter in all packet present in pcap
+                        for p in pcaps:
+                                # go to parse layer ip to record ip src dst
+                                if '-ip' in argv:
+                                        tpIP = ParseIP(p)
+
+                                # go to parse layer TCP to record the port src dst
+                                if '-p' in argv:
+                                        tpPort = ParsePorts(p)
+
+                                # go to parse layer Ether to record the mac src dst
+                                if '-m' in argv:
+                                        tpMac = ParseMac(p)
+
+                                # go to record the data
+                                if '-d' in argv:
+                                        datas = ParseData(p)
+
+                                # go to parse layer udp to record the port src dst
+                                if '-u' in argv:
+                                        tpUdp = ParseUDP(p)
+
+                                # go to parse layer ICMP to record the lenght and the mask address
+                                if '-ic' in argv:
+                                        tpIcmp = ParseICMP(p)
+
+                                # go to parse the data to extract the PE if present
+                                if '-e' in argv:
+                                        pe = ParseExe(p)
+
+                                # all parsing
+                                if '-a' in argv:
+                                        tpIP = ParseIP(p)
+                                        tpPort = ParsePorts(p)
+                                        tpMac = ParseMac(p)
+                                        datas = ParseData(p)
+                                        tpUdp = ParseUDP(p)
+                                        tpIcmp = ParseICMP(p)
+                                        pe = ParseExe(p)
+
+                                # Export the result in txt file
+                                ExportResult(tpIcmp, tpUdp, tpMac, tpPort, tpIP, datas, pe)
+
+                        # check if output di is present to zip that
+                        if 'output' in listdir(getcwd()):
+                                ZippedExe()
+
+
+                        print('\t\t[+] Parsing finished!!')
+                        print('\t\t[+] Find the export result at:')
+                        print('\t\t\t|> %s\\ImParsed.txt' %(getcwd()))
+
+                except Exception as e:
+                        print('\t[!] %s' %(e))
+
+        else:
+                Helper()
