@@ -1,0 +1,19 @@
+import sys
+import pefile
+import math
+
+def check_entropy(file_path):
+    pe = pefile.PE(file_path)                         entropy = []
+    for section in pe.sections:                           entropy.append(section.get_entropy())
+                                                      avg_entropy = sum(entropy) / len(entropy)
+    if avg_entropy > 7:                                   print("[ALERT] High entropy detected in file: {}".format(file_path))
+        if pe.is_packed():
+            print("[ALERT] File is packed")
+        else:
+            print("[ALERT] File is not packed")       else:
+        print("[OK] File entropy is within normal range")
+
+if len(sys.argv) != 2:
+    print("Usage: python3 entropy_check.py [file path]")
+else:
+    check_entropy(sys.argv[1])
